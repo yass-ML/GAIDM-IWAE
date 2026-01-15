@@ -4,6 +4,7 @@ import torch.nn.functional as F
 
 class VAE(nn.Module):
     def __init__(self,input_size, hidden_size, latent_size, output_size):
+        super().__init__()
         self.encoder = nn.Sequential(
             nn.Linear(in_features=input_size, out_features=hidden_size),
             nn.Tanh(),
@@ -37,6 +38,7 @@ class VAE(nn.Module):
         return self.decoder(z), mu, logvar, z
 
     def compute_loss(self, x, recon_x, mu, logvar, z=None):
+        x = x.view(x.size(0), -1)
         bce = F.binary_cross_entropy(recon_x,x, reduction='sum')
         kld = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
         return bce + kld

@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from vae import VAE
+from src.models.vae import VAE
 
 import numpy as np
 import math
