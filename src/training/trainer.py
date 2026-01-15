@@ -6,7 +6,6 @@ import os
 from tqdm import tqdm
 import sys
 
-# Add src to path to allow imports if running directly
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from src.models.vae import VAE
