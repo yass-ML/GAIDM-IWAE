@@ -21,7 +21,7 @@ iwae_k50_epochs50_seed42:
   weighted_reconstruction_error: 52.35
   gradient_variance: 0.00132
   gradient_snr: 0.22630000114440918
-  active_units: 35
+  active_units: 35I
 iwae_k30_epochs50_seed42:
   path: checkpoints/iwae_k30_epochs50_seed42.pt
   type: iwae
