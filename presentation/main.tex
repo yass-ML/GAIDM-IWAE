@@ -8,6 +8,8 @@
 \usepackage{graphicx,pstricks,listings,stackengine}
 \usepackage{tikz}
 \usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc, decorations.pathreplacing}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
 
 % Custom Colors from your TiKZ file
 \definecolor{myBlue}{RGB}{70, 130, 180}
@@ -65,6 +67,30 @@
 % SECTION 1: THEORY
 % =======================================================
 \section{Introduction \& Theory}
+
+\begin{frame}{The Goal: Latent Variable Inference}
+    \textbf{The Objective:} Given data $x$, we want to learn the posterior distribution of the latent variables $z$:
+    
+    $$ p(z|x) = \frac{p(x|z)p(z)}{p(x)} $$
+    
+    \begin{itemize}
+        \item $p(x|z)$: Likelihood (Decoder)
+        \item $p(z)$: Prior (e.g., $\mathcal{N}(0,I)$)
+        \item \textbf{$p(x)$: Marginal Likelihood (The Evidence)}
+    \end{itemize}
+
+    \vspace{1em}
+    
+    \begin{alertblock}{The Problem: Intractability}
+        We can't simply use Bayes Formula because p(x) is intractable. To calculate the denominator $p(x)$, we must marginalize out $z$:
+        $$ p(x) = \int p(x|z)p(z) \, dz $$
+        \begin{itemize}
+            \item This integral is \textbf{intractable} for complex neural networks.
+            \item \textbf{Consequence:} We cannot compute $p(z|x)$ analytically.
+            \item \textbf{Solution:} Approximate $p(z|x)$ with $q_\phi(z|x)$ (Variational Inference).
+        \end{itemize}
+    \end{alertblock}
+\end{frame}
 
 \begin{frame}{Standard VAE: The Objective}
     \textbf{Goal:} Maximize marginal log-likelihood $\log p(x)$.
@@ -152,22 +178,126 @@
 
 \section{The IWAE Solution}
 
-\begin{frame}{The IWAE Solution: Importance Sampling}
-    \begin{block}{Idea}
-        Use $K$ samples to tighten the bound (Burda et al., 2015).
-    \end{block}
+\begin{frame}{Novelty 1: Strictly Tighter Bounds}
+    \textbf{Theorem (Burda et al., 2015):}
+    The IWAE bound $\mathcal{L}_K$ is monotonically increasing with $K$.
     
-    $$ \mathcal{L}_K(x) = \mathbb{E}_{z_{1...K} \sim q} \left[ \log \left( \frac{1}{K} \sum_{i=1}^K \frac{p(x,z_i)}{q(z_i|x)} \right) \right] $$
+    $$ \mathcal{L}_1 \le \mathcal{L}_2 \le \dots \le \mathcal{L}_K \le \dots \le \log p(x) $$
 
-    \vspace{0.5cm}
+    \vspace{0.5em}
 
-    \textbf{Key Property (Monotonicity):}
-    $$ \mathcal{L}_1 \le \mathcal{L}_5 \le \mathcal{L}_{20} \le \dots \le \log p(x) $$
+    \begin{block}{Why?}
+        Using \textbf{Jensen's Inequality} on the concave log function:
+        $$ \mathbb{E} \left[ \log \left( \frac{1}{K} \sum w_i \right) \right] \le \log \left( \mathbb{E} \left[ \frac{1}{K} \sum w_i \right] \right) = \log p(x)$$
+    \end{block}
 
+    \textbf{Implication:}
     \begin{itemize}
-        \item \textbf{K=1}: Standard VAE.
-        \item \textbf{K > 1}: Tighter approximation of true probability.
+        \item As $K \to \infty$, the estimator converges to the true marginal likelihood $\log p(x)$.
+        \item Even with a finite $K$, we are guaranteed a better objective than VAE.
     \end{itemize}
+\end{frame}
+
+\begin{frame}{Novelty 2: Richer Implicit Posteriors}
+    \centering
+    \textbf{The IWAE Solution: Weighting as Filtering}
+    
+    \vspace{1em}
+
+    % 1. The Normalization (The Filter)
+    $$ \text{Normalized Weight: } \quad \tilde{w}_i = \frac{w_i}{\sum_{j=1}^k w_j} \quad \text{where} \quad w_i = \frac{p(x,z_i)}{q(z_i|x)} $$
+
+    \vspace{1em}
+
+    % 2. The Implicit Posterior (The Result)
+    $$ \underbrace{\tilde{q}(z|x)}_{\substack{\text{Implicit} \\ \text{Multi-modal}}} \approx \sum_{i=1}^k \tilde{w}_i \delta(z - z_i) $$
+
+    \vspace{1em}
+
+    % 3. The Gradient Update (The Mechanism)
+    $$ \nabla \mathcal{L}_k = \mathbb{E}_{\epsilon} \left[ \sum_{i=1}^{k} \textcolor{red}{\tilde{w}_i} \nabla_\theta \log w(x, z_i, \theta) \right] $$
+    
+    \vspace{0.5em}
+    
+    \begin{center}
+        \textcolor{red}{\textbf{$\uparrow$ High $\tilde{w}_i$ dominates the gradient update}}
+    \end{center}
+
+\end{frame}
+
+\begin{frame}{Why Sampling More Helps? (The Mechanics)}
+    
+    \begin{columns}[T]
+        % --- LEFT: The Problem ---
+        \begin{column}{0.48\textwidth}
+            \begin{alertblock}{Case $K=1$ (Risky)}
+                If we draw just \textbf{one} bad sample $z_1$:
+                $$ w_1 \approx 0 $$
+                $$ \log(w_1) \to \textcolor{red}{-\infty} $$
+                \vspace{0.5em}
+                \centering
+                \textbf{{Gradient Explodes}}
+            \end{alertblock}
+        \end{column}
+
+        % --- RIGHT: The Solution ---
+        \begin{column}{0.48\textwidth}
+            \begin{exampleblock}{Case $K > 1$ (Hedging)}
+                If we draw many bad samples, but just \textbf{one good one}:
+                $$ \log(0 + 0 + \dots + \textcolor{blue}{\mathbf{w_{good}}}) $$
+                $$ \approx \log(\textcolor{blue}{\mathbf{w_{good}}}) > -\infty $$
+                \vspace{0.5em}
+                \centering
+                \textbf{Stable Training}
+            \end{exampleblock}
+        \end{column}
+    \end{columns}
+
+    \vspace{2em}
+
+    % Bottom Takeaway
+    \centering
+    \textbf{The Insight:} The sum acts as a safety net. The Encoder is allowed to make mistakes, as long as it gets it right \textit{once}.
+
+\end{frame}
+
+\begin{frame}{The Mechanism: Importance Weighting}
+    \vspace{0.5em}
+    \begin{columns}[T] % T aligns columns at the top
+        % --- LEFT: The Math ---
+        \begin{column}{0.48\textwidth}
+            \textbf{1. The Definition}
+            \begin{itemize}
+                \item Calculate raw weight:
+                $$ w_i = \frac{p(x,z_i)}{q(z_i|x)} $$
+                \item Normalize:
+                $$ \tilde{w}_i = \frac{w_i}{\sum_{j=1}^k w_j} $$
+            \end{itemize}
+        \end{column}
+
+        % --- RIGHT: The Intuition ---
+        \begin{column}{0.48\textwidth}
+            \textbf{2. The Intuition}
+            \vspace{1em}
+            \begin{itemize}
+                \item[] Sample $z_i$ is \textbf{Good}
+                \par $\to p(x,z_i)$ is High
+                \par $\to \textcolor{green}{\mathbf{\tilde{w}_i \approx 1}}$
+                \vspace{1em}
+                \item[] Sample $z_j$ is \textbf{Bad}
+                \par $\to p(x,z_j)$ is Low
+                \par $\to \textcolor{red}{\mathbf{\tilde{w}_j \approx 0}}$
+            \end{itemize}
+        \end{column}
+    \end{columns}
+
+    \vspace{1.5em}
+
+    % --- BOTTOM: The Takeaway ---
+    \begin{block}{Key Result: The Filter Effect}
+        The gradient update effectively \textbf{ignores} bad samples:
+        $$ \nabla \theta \approx \sum_{i=1}^{k} \underbrace{\textcolor{blue}{\mathbf{\tilde{w}_i}}}_{\text{Quality Score}} \cdot \nabla \log w(x, z_i) $$
+    \end{block}
 \end{frame}
 
 \begin{frame}{IWAE Architecture}
@@ -281,7 +411,7 @@
             Encoder & MLP ($784 \to 400 \to 20$) \\
             Decoder & MLP ($20 \to 400 \to 784$) \\
             Optimizer & Adam ($lr=1e-3$) \\
-            \textbf{K (Samples)} & \textbf{1, 5, 20} \\
+            \textbf{K (Samples)} & \textbf{1, 5, 20, 30, 50, 100} \\
             \bottomrule
         \end{tabular}
     \end{table}
@@ -297,20 +427,52 @@
 \section{Results}
 
 \subsection{Log-Likelihood}
-\begin{frame}{Result 1: Log-Likelihood Estimation}
+\begin{frame}{Result 1: Estimated Log-Likelihood vs Number of Samples (K)}
     \begin{itemize}
-        \item \textbf{Metric:} Negative Log-Likelihood (Lower is better) or ELBO (Higher is better).
+        \item \textbf{Metric:} Estimated Log-Likelihood (Higher is better).
     \end{itemize}
 
-    % REPLACE WITH YOUR IMAGE
     \begin{figure}[htpb]
         \centering
-        % \includegraphics[width=0.7\linewidth]{pic/nll_plot.png} 
-        \rule{0.7\linewidth}{4cm} % Placeholder black box
-        \caption{Estimated Log-Likelihood over Epochs}
+        \begin{tikzpicture}
+            \begin{axis}[
+                ybar,
+                width=0.85\textwidth,
+                height=6cm,
+                ylabel={Log-Likelihood},
+                xlabel={Number of Samples (K)},
+                symbolic x coords={K=1, K=5, K=20, K=30, K=50, K=100},
+                xtick=data,
+                ymin=-83,
+                ymax=-74,
+                nodes near coords,
+                nodes near coords align={vertical},
+                every node near coord/.append style={font=\scriptsize, rotate=0},
+                bar width=20pt,
+                enlarge x limits=0.12,
+                legend style={at={(0.02,0.98)}, anchor=north west, font=\small},
+                ymajorgrids=true,
+                grid style=dashed,
+            ]
+            % VAE (K=1) in red
+            \addplot[fill=red!70, draw=red!90] coordinates {
+                (K=1, -81.06)
+            };
+            % IWAE (K>1) in blue
+            \addplot[fill=myBlue!70, draw=myBlue!90] coordinates {
+                (K=5, -78.36)
+                (K=20, -77.34)
+                (K=30, -77.12)
+                (K=50, -76.58)
+                (K=100, -76.17)
+            };
+            \legend{VAE (K=1), IWAE (K$>$1)}
+            \end{axis}
+        \end{tikzpicture}
+        \caption{Estimated Log-Likelihood on MNIST Test Set (Higher is Better)}
     \end{figure}
 
-    \textbf{Observation:} $\mathcal{L}_{20} > \mathcal{L}_{5} > \mathcal{L}_{1}$. Increasing $K$ strictly tightens the bound.
+    \textbf{Observation:} $\mathcal{L}_{100} > \mathcal{L}_{50} > \mathcal{L}_{20} > \mathcal{L}_{5} > \mathcal{L}_{1}$. Increasing $K$ strictly tightens the bound.
 \end{frame}
 
 \subsection{Latent Utilization}
@@ -328,6 +490,35 @@
     \end{figure}
 
     \textbf{Observation:} IWAE ($K=20$) utilizes more of the latent space, reducing the "Posterior Collapse" often seen in standard VAEs.
+\end{frame}
+
+\subsection{K-Analysis}
+\begin{frame}{Analysis: Impact of K on Complexity}
+    \begin{columns}
+        \column{0.5\textwidth}
+        \centering
+        \textbf{Training Time vs. K}
+        \begin{tikzpicture}[scale=0.6]
+            \draw[->] (0,0) -- (4,0) node[right] {$K$};
+            \draw[->] (0,0) -- (0,4) node[above] {Time / Memory};
+            \draw[blue, thick] (0,0) -- (3.5, 3.5); % Linear slope
+            \node[below] at (1,0) {1};
+            \node[below] at (2,0) {5};
+            \node[below] at (3.5,0) {20};
+            \fill[blue] (1,1) circle (2pt);
+            \fill[blue] (2,2) circle (2pt);
+            \fill[blue] (3.5,3.5) circle (2pt);
+            \node[anchor=north west, blue] at (0.5, 3) {Linear Growth $O(K)$};
+        \end{tikzpicture}
+
+        \column{0.5\textwidth}
+        \textbf{Trade-off Analysis:}
+        \begin{itemize}
+            \item \textbf{Compute:} Training time and memory usage scale \textbf{linearly} with $K$.
+            \item \textbf{Performance:} Returns diminish as $K$ increases (gap between $K=5$ and $K=20$ is smaller than $1 \to 5$).
+            \item \textbf{Gradient Variance:} Higher $K$ leads to lower variance gradients (DReG estimator), stabilizing training.
+        \end{itemize}
+    \end{columns}
 \end{frame}
 
 \subsection{Sample Quality}
