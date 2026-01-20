@@ -1,0 +1,71 @@
+\documentclass{article}
+
+% ---------------------------------------------------------
+% 1. SETUP & PACKAGES
+% ---------------------------------------------------------
+\PassOptionsToPackage{numbers, compress}{natbib}
+
+% [preprint] shows your names. Change to [final] for the final version.
+\usepackage[final]{neurips_2024}
+
+% Remove the conference footer from the first page
+\makeatletter
+\renewcommand{\@noticestring}{}
+\makeatother
+
+\usepackage[utf8]{inputenc} % allow utf-8 input
+\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+\usepackage{hyperref}       % hyperlinks
+\usepackage{url}            % simple URL typesetting
+\usepackage{booktabs}       % professional-quality tables
+\usepackage{amsmath}        % best math environment
+\usepackage{amsfonts}       % blackboard math symbols
+\usepackage{nicefrac}       % compact symbols for 1/2, etc.
+\usepackage[expansion=false]{microtype}      % microtypography
+\usepackage{graphicx}       % for images
+\usepackage{enumitem}       % for cleaner lists
+\usepackage{multirow}
+\usepackage{xcolor}         % color text
+
+
+% ---------------------------------------------------------
+% 2. TITLE & AUTHORS
+% ---------------------------------------------------------
+\title{IWAE vs VAE : borne plus serrée, latents plus riches ?}
+
+\author{%
+  Amine Mike El Maalouf \\
+  \texttt{amine.el-maalouf@epita.fr} \\
+  \And
+  Cedric Damais \\
+  \texttt{cedric.damais@epita.fr} \\
+  \And
+  Yacine Benihaddadene \\
+  \texttt{yacine.benihaddadene@epita.fr} \\
+  \And
+  Leon Ayral \\
+  \texttt{leon.ayral@epita.fr} \\
+}
+
+\begin{document}
+
+\maketitle
+
+% ---------------------------------------------------------
+% 3. ABSTRACT
+% ---------------------------------------------------------
+
+\begin{abstract}
+Les Autoencodeurs Variationnels (VAE) sont des modèles génératifs permettant d'approximer des distributions a posteriori complexes via la maximisation d'une borne inférieure variationnelle (ELBO). Cependant, l'objectif standard du VAE contraint souvent le modèle à apprendre des représentations simplifiées, limitant ainsi sa capacité de modélisation. Ce projet étudie l'Importance Weighted Autoencoder (IWAE), une généralisation du VAE qui optimise une borne strictement plus fine dérivée de l'échantillonnage préférentiel. Nous analysons l'impact théorique de cet objectif sur l'estimation des gradients et la flexibilité du postérieur. Nos expériences sur le jeu de données MNIST démontrent que l'utilisation de multiples échantillons pondérés ($k>1$) améliore significativement la log-vraisemblance par rapport au VAE standard ($k=1$). De plus, nos résultats confirment que l'IWAE exploite plus efficacement l'espace latent, augmentant le nombre d'unités actives et produisant des représentations plus riches.
+\end{abstract}
+
+\newpage
+% ---------------------------------------------------------
+% 4. SECTIONS
+% ---------------------------------------------------------
+\section{Introduction}
+
+Dans ce rapport nous étudierons
+
+
+\end{document}
