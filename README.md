@@ -5,3 +5,4 @@
 - Cédric Damais
 - Amine Mike El Maalouf
 - Léon Ayral
+- Oscar Le Dauphin
