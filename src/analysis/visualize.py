@@ -23,9 +23,14 @@ def plot_reconstruction(model, dataloader, device, save_path):
         if len(recon.shape) == 3:
             recon = recon.mean(dim=0)
 
+    # Randomly select 8 samples
+    batch_size = data.size(0)
+    num_samples = min(8, batch_size)
+    indices = torch.randperm(batch_size)[:num_samples]
+    
     # Reshape
-    input_imgs = data[:8].view(-1, 28, 28).cpu()
-    recon_imgs = recon[:8].view(-1, 28, 28).cpu()
+    input_imgs = data[indices].view(-1, 28, 28).cpu()
+    recon_imgs = recon[indices].view(-1, 28, 28).cpu()
 
     fig, axes = plt.subplots(2, 8, figsize=(12, 3))
     for i in range(8):

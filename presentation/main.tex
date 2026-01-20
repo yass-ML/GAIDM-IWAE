@@ -584,14 +584,12 @@
         \column{0.45\textwidth}
         \centering
         \textbf{VAE (K=1)} \\
-        % \includegraphics[width=0.8\textwidth]{pic/vae_samples.png}
-        \rule{0.8\textwidth}{3cm} % Placeholder
+        \includegraphics[width=0.5\textwidth]{pic/vae_sample.png}
         
         \column{0.45\textwidth}
         \centering
-        \textbf{IWAE (K=20)} \\
-        % \includegraphics[width=0.8\textwidth]{pic/iwae_samples.png}
-        \rule{0.8\textwidth}{3cm} % Placeholder
+        \textbf{IWAE (K=50)} \\
+        \includegraphics[width=0.5\textwidth]{pic/iwae_sample.png}
     \end{columns}
 
     \vspace{1em}
@@ -609,12 +607,14 @@
         \centering
         \begin{tabular}{l|c|c}
              \toprule
-             \textbf{Metric} & \textbf{VAE (K=1)} & \textbf{IWAE (K=20)} \\
+             \textbf{Metric} & \textbf{VAE (K=1)} & \textbf{IWAE (K=50)} \\
              \midrule
              Bound Tightness & Loose & \textbf{Tight} \\
              Latent Usage & Risk of Collapse & \textbf{Rich} \\
-             Gradient Variance & High & \textbf{Low} \\
-             Compute Cost & \textbf{Low} & High ($ \times K$) \\
+             Bound Variance & High & \textbf{Low} \\
+             Encoder Gradient SNR & \textbf{High} & Low \\
+             Sample Quality & Blurry & \textbf{Sharp} \\
+             Compute Cost & \textbf{Low} & High ($\times K$) \\
              \bottomrule
         \end{tabular}
     \end{table}
