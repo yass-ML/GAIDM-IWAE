@@ -1,0 +1,385 @@
+\documentclass{beamer}
+\usepackage{hyperref}
+\usepackage[T1]{fontenc}
+
+
+% other packages
+\usepackage{latexsym,amsmath,xcolor,multicol,booktabs}
+\usepackage{graphicx,pstricks,listings,stackengine}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc, decorations.pathreplacing}
+
+% Custom Colors from your TiKZ file
+\definecolor{myBlue}{RGB}{70, 130, 180}
+\definecolor{myOrange}{RGB}{255, 140, 0}
+\definecolor{myGreen}{RGB}{60, 179, 113}
+
+% --- UPDATE YOUR DETAILS HERE ---
+\author{Cedric Damais, Yacine Benihaddadene, Amine Mike El Maalouf, Leon Ayral} % Change this to your name
+\title{IWAE vs. VAE}
+\subtitle{Tighter Bounds, Richer Latents?}
+\institute{GAIDM \\ EPITA}
+\date{\today} 
+
+% Load the custom theme
+\usepackage{NJUPT}
+
+% defs (Kept from your template)
+\def\cmd#1{\texttt{\color{red}\footnotesize $\backslash$#1}}
+\def\env#1{\texttt{\color{blue}\footnotesize #1}}
+\definecolor{deepblue}{rgb}{0,0,0.5}
+\definecolor{deepred}{rgb}{0.6,0,0}
+\definecolor{deepgreen}{rgb}{0,0.5,0}
+\definecolor{halfgray}{gray}{0.55}
+
+\lstset{
+    basicstyle=\ttfamily\small,
+    keywordstyle=\bfseries\color{deepblue},
+    emphstyle=\ttfamily\color{deepred},
+    stringstyle=\color{deepgreen},
+    numbers=left,
+    numberstyle=\small\color{halfgray},
+    rulesepcolor=\color{red!20!green!20!blue!20},
+    frame=shadowbox,
+}
+
+\begin{document}
+
+% Title Page
+\begin{frame}
+    \titlepage
+    \begin{figure}[htpb]
+        \begin{center}
+            % Keep the Logo if you want it
+            \includegraphics[width=0.2\linewidth]{pic/epita-logo.png}
+        \end{center}
+    \end{figure}
+\end{frame}
+
+% Table of Contents
+\begin{frame}
+    \tableofcontents[sectionstyle=show,subsectionstyle=show/shaded/hide,subsubsectionstyle=show/shaded/hide]
+\end{frame}
+
+% =======================================================
+% SECTION 1: THEORY
+% =======================================================
+\section{Introduction \& Theory}
+
+\begin{frame}{Standard VAE: The Objective}
+    \textbf{Goal:} Maximize marginal log-likelihood $\log p(x)$.
+    \vspace{0.5em}
+    
+    Since $p(x)$ is intractable, VAE ($K=1$) maximizes the \textbf{ELBO}:
+    $$ \log p(x) \ge \mathcal{L}_{\text{VAE}} = \mathbb{E}_{z \sim q} \left[ \log \frac{p(x,z)}{q(z|x)} \right] $$
+
+    \vspace{1em}
+    
+    \begin{alertblock}{The Problem: The "Gap"}
+        The bound is strictly lower than the evidence due to the KL divergence:
+        $$ \log p(x) - \mathcal{L}_{\text{VAE}} = \text{KL}(q(z|x) || p(z|x)) $$
+    \end{alertblock}
+    
+    \begin{itemize}
+        \item If $q(z|x)$ is too simple $\rightarrow$ \textbf{Loose Bound}.
+        \item Loose bound $\rightarrow$ Risk of \textbf{Posterior Collapse}.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Model Architecture}
+    \centering
+    % Resizebox ensures the graph fits the slide width automatically
+    \resizebox{0.95\textwidth}{!}{%
+        \begin{tikzpicture}[
+            node distance=1.5cm,
+            font=\sffamily\bfseries,
+            >={Stealth[length=3mm, width=2mm]},
+            % Styles
+            box/.style={
+                draw=black!70, thick, align=center, minimum height=1cm, minimum width=1.5cm, fill=white, rounded corners
+            },
+            trapezium_enc/.style={
+                trapezium, trapezium angle=70, draw=myBlue!80, thick, fill=myBlue!10, 
+                align=center, minimum height=1.5cm, minimum width=2.5cm, shape border rotate=270
+            },
+            trapezium_dec/.style={
+                trapezium, trapezium angle=70, draw=myOrange!80, thick, fill=myOrange!10, 
+                align=center, minimum height=1.5cm, minimum width=2.5cm, shape border rotate=90
+            },
+            latent/.style={
+                circle, draw=myGreen!80, thick, fill=myGreen!10, align=center, minimum size=1.5cm
+            }
+        ]
+
+            % --- Nodes ---
+
+            % 1. Input
+            \node[box] (x) {Input\\$x$};
+
+            % 2. Encoder (Compressing)
+            \node[trapezium_enc, right=1cm of x] (encoder) {Encoder\\$q_\phi(z|x)$};
+
+            % 3. Distribution Parameters (Merged mu/sigma)
+            \node[box, right=0.8cm of encoder, draw=myBlue, dashed] (dist) {Distribution\\$\mathcal{N}(\mu, \sigma^2)$};
+
+            % 4. Latent Variable (Sampling)
+            \node[latent, right=1.5cm of dist] (z) {$z$};
+
+            % 5. Decoder (Expanding)
+            \node[trapezium_dec, right=0.8cm of z] (decoder) {Decoder\\$p_\theta(x|z)$};
+
+            % 6. Output
+            \node[box, right=1cm of decoder] (xhat) {Recon.\\$\hat{x}$};
+
+            % --- Arrows ---
+            \draw[->, thick] (x) -- (encoder);
+            \draw[->, thick] (encoder) -- (dist);
+            
+            % Sampling Arrow
+            \draw[->, thick, dashed] (dist) -- node[midway, above, font=\small\normalfont, text=black] {Sample $\sim$} (z);
+            
+            \draw[->, thick] (z) -- (decoder);
+            \draw[->, thick] (decoder) -- (xhat);
+
+            % --- Loss Annotation ---
+            \draw[<->, red!70, dashed, thick] (x.south) to[bend right=30] node[midway, below] {Reconstruction Loss} (xhat.south);
+            
+            \node[above=0.2cm of dist, text=red!70, font=\small] {KL Loss};
+
+        \end{tikzpicture}%
+    }
+\end{frame}
+
+\section{The IWAE Solution}
+
+\begin{frame}{The IWAE Solution: Importance Sampling}
+    \begin{block}{Idea}
+        Use $K$ samples to tighten the bound (Burda et al., 2015).
+    \end{block}
+    
+    $$ \mathcal{L}_K(x) = \mathbb{E}_{z_{1...K} \sim q} \left[ \log \left( \frac{1}{K} \sum_{i=1}^K \frac{p(x,z_i)}{q(z_i|x)} \right) \right] $$
+
+    \vspace{0.5cm}
+
+    \textbf{Key Property (Monotonicity):}
+    $$ \mathcal{L}_1 \le \mathcal{L}_5 \le \mathcal{L}_{20} \le \dots \le \log p(x) $$
+
+    \begin{itemize}
+        \item \textbf{K=1}: Standard VAE.
+        \item \textbf{K > 1}: Tighter approximation of true probability.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{IWAE Architecture}
+    \centering
+    \resizebox{1.0\textwidth}{!}{%
+    \begin{tikzpicture}[
+    node distance=1.5cm,
+    font=\sffamily\bfseries,
+    >={Stealth[length=3mm, width=2mm]},
+    % Styles
+    box/.style={
+        draw=black!70, thick, align=center, minimum height=1cm, minimum width=1.5cm, fill=white, rounded corners
+    },
+    trapezium_enc/.style={
+        trapezium, trapezium angle=70, draw=myBlue!80, thick, fill=myBlue!10, 
+        align=center, minimum height=1.5cm, minimum width=2.5cm, shape border rotate=270
+    },
+    % LARGE TRAPEZOID DECODER
+    large_decoder/.style={
+        trapezium, trapezium angle=75, draw=myOrange!80, thick, fill=myOrange!10, 
+        align=center, minimum height=3.0cm, minimum width=1.0cm, shape border rotate=90, rounded corners=2pt
+    },
+    latent/.style={
+        circle, draw=myGreen!80, thick, fill=myGreen!10, align=center, minimum size=1.0cm, font=\small
+    },
+    weight/.style={
+        draw=black!60, thin, fill=gray!10, minimum height=0.8cm, minimum width=1.3cm, font=\scriptsize, align=center
+    },
+    loss_box/.style={
+        draw=red!70, thick, fill=red!5, align=center, minimum height=1.2cm, minimum width=2cm, rounded corners
+    }
+]
+
+    % --- 1. Input & Encoder ---
+    \node[box] (x) {Input\\$x$};
+    \node[trapezium_enc, right=1cm of x] (encoder) {Encoder\\$q_\phi(z|x)$};
+    \node[box, right=0.8cm of encoder, draw=myBlue, dashed] (dist) {Dist.\\$\mathcal{N}(\mu, \sigma)$};
+
+    % --- 2. The K Samples ---
+    % Positioned vertically
+    \node[latent, right=2cm of dist, yshift=1.8cm] (z1) {$z_1$};
+    \node[latent, right=2cm of dist, yshift=-1.8cm] (zk) {$z_K$};
+    
+    % Sampling Arrows
+    \draw[->, thick, dashed] (dist.east) -- (z1.west);
+    \draw[->, thick, dashed] (dist.east) -- (zk.west);
+    
+    % Vertical dots
+    \path (z1) -- (zk) node[midway, font=\Huge] {$\vdots$};
+
+    % --- 3. The Single Decoder (Trapezoid) ---
+    % --- 3. The Single Decoder (Trapezoid) ---
+    % 'minimum height' controls the vertical size (5.5cm)
+    % 'minimum width' controls the horizontal size (3.5cm)
+    \node[large_decoder, right=1.0cm of $(z1)!0.5!(zk)$, minimum height=3.0cm, minimum width=2.0cm] (decoder) {Decoder\\$p_\theta(x|z)$};
+    
+    % --- Connecting Z arrows to the BACK (Left Side) ---
+    % We use angle anchors to force the connection to the Left side.
+    % 180 is left. 165 is slightly up-left. 195 is slightly down-left.
+    
+    \draw[->, thick] (z1) -- (decoder.165);
+    \draw[->, thick] (zk) -- (decoder.195);
+    % --- 4. Importance Weights (Outputs) ---
+    \node[weight, right=1.0cm of decoder, yshift=1.8cm] (w1) {$w_1 = \frac{p(x,z_1)}{q(z_1|x)}$};
+    \node[weight, right=1.0cm of decoder, yshift=-1.8cm] (wk) {$w_K = \frac{p(x,z_K)}{q(z_K|x)}$};
+    
+    % Dots between weights
+    \path (w1) -- (wk) node[midway, font=\Huge] {$\vdots$};
+
+    % Arrows exiting decoder
+    % We anchor them to the right side of the trapezoid
+    \draw[->, thick] (decoder.east |- w1) -- (w1);
+    \draw[->, thick] (decoder.east |- wk) -- (wk);
+
+    % --- 5. Aggregation & Loss ---
+    \node[loss_box, right=1.2cm of $(w1)!0.5!(wk)$] (loss) {\textbf{IWAE Loss}\\$\log \frac{1}{K} \sum w_i$};
+
+    % Connect weights to loss
+    \draw[->, thick] (w1.east) -- (loss.north west);
+    \draw[->, thick] (wk.east) -- (loss.south west);
+
+    % --- Standard Connections ---
+    \draw[->, thick] (x) -- (encoder);
+    \draw[->, thick] (encoder) -- (dist);
+
+
+\end{tikzpicture}
+    }
+\end{frame}
+
+% =======================================================
+% SECTION 2: METHODOLOGY
+% =======================================================
+\section{Methodology}
+
+\begin{frame}{Experimental Setup}
+    \begin{itemize}
+        \item \textbf{Objective:} Compare VAE ($K=1$) vs IWAE ($K>1$).
+        \item \textbf{Constraint:} \textbf{Identical Architecture} for fair comparison.
+    \end{itemize}
+
+    \vspace{0.5em}
+
+    \begin{table}[h]
+        \centering
+        \begin{tabular}{c|c}
+            \toprule
+            \textbf{Parameter} & \textbf{Value} \\
+            \midrule
+            Dataset & MNIST (Binarized) \\
+            Encoder & MLP ($784 \to 400 \to 20$) \\
+            Decoder & MLP ($20 \to 400 \to 784$) \\
+            Optimizer & Adam ($lr=1e-3$) \\
+            \textbf{K (Samples)} & \textbf{1, 5, 20} \\
+            \bottomrule
+        \end{tabular}
+    \end{table}
+
+    \begin{exampleblock}{Implementation Detail}
+        Used \texttt{torch.logsumexp} to avoid numerical underflow.
+    \end{exampleblock}
+\end{frame}
+
+% =======================================================
+% SECTION 3: RESULTS
+% =======================================================
+\section{Results}
+
+\subsection{Log-Likelihood}
+\begin{frame}{Result 1: Log-Likelihood Estimation}
+    \begin{itemize}
+        \item \textbf{Metric:} Negative Log-Likelihood (Lower is better) or ELBO (Higher is better).
+    \end{itemize}
+
+    % REPLACE WITH YOUR IMAGE
+    \begin{figure}[htpb]
+        \centering
+        % \includegraphics[width=0.7\linewidth]{pic/nll_plot.png} 
+        \rule{0.7\linewidth}{4cm} % Placeholder black box
+        \caption{Estimated Log-Likelihood over Epochs}
+    \end{figure}
+
+    \textbf{Observation:} $\mathcal{L}_{20} > \mathcal{L}_{5} > \mathcal{L}_{1}$. Increasing $K$ strictly tightens the bound.
+\end{frame}
+
+\subsection{Latent Utilization}
+\begin{frame}{Result 2: Latent Utilization}
+    \begin{itemize}
+        \item \textbf{Metric:} Active Units (Dimensions where $KL > \epsilon$).
+    \end{itemize}
+
+    % REPLACE WITH YOUR IMAGE
+    \begin{figure}[htpb]
+        \centering
+        % \includegraphics[width=0.7\linewidth]{pic/kl_plot.png}
+        \rule{0.7\linewidth}{4cm} % Placeholder black box
+        \caption{KL Divergence per Latent Dimension}
+    \end{figure}
+
+    \textbf{Observation:} IWAE ($K=20$) utilizes more of the latent space, reducing the "Posterior Collapse" often seen in standard VAEs.
+\end{frame}
+
+\subsection{Sample Quality}
+\begin{frame}{Result 3: Sample Quality}
+    \begin{columns}
+        \column{0.45\textwidth}
+        \centering
+        \textbf{VAE (K=1)} \\
+        % \includegraphics[width=0.8\textwidth]{pic/vae_samples.png}
+        \rule{0.8\textwidth}{3cm} % Placeholder
+        
+        \column{0.45\textwidth}
+        \centering
+        \textbf{IWAE (K=20)} \\
+        % \includegraphics[width=0.8\textwidth]{pic/iwae_samples.png}
+        \rule{0.8\textwidth}{3cm} % Placeholder
+    \end{columns}
+
+    \vspace{1em}
+    \centering
+    \textit{IWAE samples typically show sharper strokes and fewer "averaged" blurry digits.}
+\end{frame}
+
+% =======================================================
+% SECTION 4: CONCLUSION
+% =======================================================
+\section{Conclusion}
+
+\begin{frame}{Trade-offs Summary}
+    \begin{table}[htbp]
+        \centering
+        \begin{tabular}{l|c|c}
+             \toprule
+             \textbf{Metric} & \textbf{VAE (K=1)} & \textbf{IWAE (K=20)} \\
+             \midrule
+             Bound Tightness & Loose & \textbf{Tight} \\
+             Latent Usage & Risk of Collapse & \textbf{Rich} \\
+             Gradient Variance & High & \textbf{Low} \\
+             Compute Cost & \textbf{Low} & High ($ \times K$) \\
+             \bottomrule
+        \end{tabular}
+    \end{table}
+\end{frame}
+
+\begin{frame}
+    \begin{center}
+        {\Huge\textit{Thanks!}}
+        
+        \vspace{1cm}
+        
+        \textbf{Q \& A}
+    \end{center}
+\end{frame}
+
+\end{document}
