@@ -3,6 +3,7 @@ import torch
 import torch.optim as optim
 import argparse
 import os
+import time
 from tqdm import tqdm
 import sys
 
@@ -132,11 +133,35 @@ if __name__ == "__main__":
     # Trainer
     print(f"Training {args.model.upper()} with K={args.k} on {args.device}...")
     trainer = Trainer(model, optimizer, train_loader, val_loader, device=args.device)
-    trainer = Trainer(model, optimizer, train_loader, val_loader, device=args.device)
+
+    start_time = time.time()
     trainer.fit(args.epochs)
+    end_time = time.time()
+
+    training_time = end_time - start_time
+    print(f"Training finished in {training_time:.2f} seconds")
 
     # Save Model
     os.makedirs(args.save_dir, exist_ok=True)
     filename = f"{args.model}_k{args.k}_epochs{args.epochs}_seed{args.seed}.pt"
     save_path = os.path.join(args.save_dir, filename)
     trainer.save_checkpoint(save_path)
+
+    # Save training time to centralized results
+    try:
+        from src.utils.checkpoint_utils import save_results, get_model_key
+        model_key = get_model_key(save_path)
+        save_results(
+            results_path='results/evaluations.yaml',
+            model_key=model_key,
+            metrics={'training_time': training_time},
+            model_info={
+                'path': save_path,
+                'type': args.model,
+                'k': args.k,
+                'epochs': args.epochs
+            }
+        )
+        print(f"Training time saved to results/evaluations.yaml")
+    except ImportError:
+        print("Warning: Could not import checkpoint_utils to save training time.")

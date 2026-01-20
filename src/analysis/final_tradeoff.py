@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import sys
 import os
+import argparse
 
 # Add src to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
@@ -13,8 +14,14 @@ from src.models.vae import VAE
 from src.models.iwae import IWAE
 from src.data.mnist_loader import get_dataloaders
 from src.analysis.gradient_variance import compute_gradient_variance
+from src.utils.checkpoint_utils import get_models_config, save_results, get_model_key
 
-def analyze_tradeoff():
+
+def analyze_tradeoff(
+    checkpoint_dir: str = 'checkpoints',
+    results_path: str = 'results/evaluations.yaml',
+    output_path: str = './notebook_results/tradeoff_analysis.png'
+):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(f"Using device: {device}")
 
@@ -24,12 +31,29 @@ def analyze_tradeoff():
     latent_size = 50
     output_size = 784
 
-    # Models to evaluate
-    models_config = [
-        {'name': 'VAE (K=1)', 'type': 'vae', 'k': 1, 'path': 'checkpoints/vae_k1_epochs50_seed42.pt', 'll': -81.06},
-        {'name': 'IWAE (K=5)', 'type': 'iwae', 'k': 5, 'path': 'checkpoints/iwae_k5_epochs50_seed42.pt', 'll': -78.36},
-        {'name': 'IWAE (K=20)', 'type': 'iwae', 'k': 20, 'path': 'checkpoints/iwae_k20_epochs50_seed42.pt', 'll': -77.33}
-    ]
+    # Get models config from checkpoint discovery + stored results
+    models_config = get_models_config(checkpoint_dir, results_path)
+
+    if not models_config:
+        print(f"No checkpoints found in {checkpoint_dir}")
+        print("Run trainer.py first to create checkpoints.")
+        return
+
+    # Filter for valid models (with parseable k values)
+    models_config = [m for m in models_config if m.get('k') is not None]
+
+    if not models_config:
+        print("No valid checkpoints found with standard naming convention.")
+        return
+
+    # Check for missing log-likelihoods
+    missing_ll = [m['name'] for m in models_config if m.get('log_likelihood') is None]
+    if missing_ll:
+        print(f"\nWarning: The following models are missing log-likelihood values:")
+        for name in missing_ll:
+            print(f"  - {name}")
+        print(f"\nRun: python src/analysis/evaluate_likelihood.py --checkpoint_dir {checkpoint_dir}")
+        print("to compute log-likelihoods first.\n")
 
     # Data (single batch for gradient variance)
     train_loader, _, _ = get_dataloaders(batch_size=32)
@@ -38,9 +62,9 @@ def analyze_tradeoff():
 
     results = []
 
-    print("-" * 60)
-    print(f"{'Model':<15} | {'Test LL':<10} | {'Grad Var':<10} | {'Grad SNR':<10}")
-    print("-" * 60)
+    print("-" * 70)
+    print(f"{'Model':<15} | {'Test LL':<12} | {'Grad Var':<12} | {'Grad SNR':<10}")
+    print("-" * 70)
 
     for cfg in models_config:
         # Load Model
@@ -60,21 +84,47 @@ def analyze_tradeoff():
         # Compute Gradient Variance
         variance, snr = compute_gradient_variance(model, data, n_runs=100)
 
+        # Save gradient metrics to YAML
+        model_key = get_model_key(cfg['path'])
+        save_results(
+            results_path=results_path,
+            model_key=model_key,
+            metrics={
+                'gradient_variance': float(f"{variance:.2e}"),
+                'gradient_snr': round(snr, 4)
+            }
+        )
+
+        ll_value = cfg.get('log_likelihood')
+        ll_display = f"{ll_value:.2f}" if ll_value is not None else "N/A"
+
         results.append({
+            'name': cfg['name'],
             'k': cfg['k'],
-            'll': cfg['ll'],
+            'll': ll_value,
             'variance': variance,
             'snr': snr
         })
 
-        print(f"{cfg['name']:<15} | {cfg['ll']:<10.2f} | {variance:<10.2e} | {snr:<10.4f}")
+        print(f"{cfg['name']:<15} | {ll_display:<12} | {variance:<12.2e} | {snr:<10.4f}")
 
-    print("-" * 60)
+    print("-" * 70)
+
+    # Filter results with LL for plotting
+    results_with_ll = [r for r in results if r['ll'] is not None]
+
+    if not results_with_ll:
+        print("\nNo models have log-likelihood computed. Run evaluate_likelihood.py first.")
+        print("Skipping plot generation.")
+        return
+
+    # Sort by K for proper line plot
+    results_with_ll.sort(key=lambda x: x['k'])
 
     # Plotting
-    ks = [r['k'] for r in results]
-    lls = [r['ll'] for r in results]
-    snrs = [r['snr'] for r in results]
+    ks = [r['k'] for r in results_with_ll]
+    lls = [r['ll'] for r in results_with_ll]
+    snrs = [r['snr'] for r in results_with_ll]
 
     fig, ax1 = plt.subplots(figsize=(10, 6))
 
@@ -86,19 +136,35 @@ def analyze_tradeoff():
     ax1.set_xticks(ks)
     ax1.grid(True, alpha=0.3)
 
-    ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
+    ax2 = ax1.twinx()
 
     color = 'tab:red'
-    ax2.set_ylabel('Gradient SNR (Higher is Stable)', color=color)  # we already handled the x-label with ax1
+    ax2.set_ylabel('Gradient SNR (Higher is Stable)', color=color)
     ax2.plot(ks, snrs, marker='s', color=color, linewidth=2, linestyle='--', label='Gradient SNR')
     ax2.tick_params(axis='y', labelcolor=color)
 
     plt.title('Trade-off: Performance vs Optimization Stability')
-    fig.tight_layout()  # otherwise the right y-label is slightly clipped
+    fig.tight_layout()
 
-    output_path = './notebook_results/tradeoff_analysis.png'
+    # Ensure output directory exists
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
     plt.savefig(output_path)
-    print(f"Trade-off plot saved to {output_path}")
+    print(f"\nTrade-off plot saved to {output_path}")
+
 
 if __name__ == "__main__":
-    analyze_tradeoff()
+    parser = argparse.ArgumentParser(description="Analyze Performance vs Stability Trade-off")
+    parser.add_argument('--checkpoint_dir', type=str, default='checkpoints',
+                        help='Directory containing model checkpoints')
+    parser.add_argument('--results_path', type=str, default='results/evaluations.yaml',
+                        help='Path to evaluations YAML file')
+    parser.add_argument('--output', type=str, default='./results/tradeoff_analysis.png',
+                        help='Path to save the plot')
+
+    args = parser.parse_args()
+
+    analyze_tradeoff(
+        checkpoint_dir=args.checkpoint_dir,
+        results_path=args.results_path,
+        output_path=args.output
+    )

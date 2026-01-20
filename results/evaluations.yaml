@@ -1,0 +1,71 @@
+iwae_k100_epochs50_seed42:
+  path: checkpoints/iwae_k100_epochs50_seed42.pt
+  type: iwae
+  k: 100
+  epochs: 50
+  training_time: 551.2770173549652
+  log_likelihood: -76.17
+  reconstruction_error: 74.7
+  weighted_reconstruction_error: 52.02
+  gradient_variance: 0.00102
+  gradient_snr: 0.17710000276565552
+  active_units: 30
+iwae_k50_epochs50_seed42:
+  path: checkpoints/iwae_k50_epochs50_seed42.pt
+  type: iwae
+  k: 50
+  epochs: 50
+  training_time: 489.5077793598175
+  log_likelihood: -76.58
+  reconstruction_error: 72.82
+  weighted_reconstruction_error: 52.35
+  gradient_variance: 0.00132
+  gradient_snr: 0.22630000114440918
+  active_units: 35
+iwae_k30_epochs50_seed42:
+  path: checkpoints/iwae_k30_epochs50_seed42.pt
+  type: iwae
+  k: 30
+  epochs: 50
+  training_time: 470.7502646446228
+  log_likelihood: -77.12
+  reconstruction_error: 70.81
+  weighted_reconstruction_error: 53.01
+  gradient_variance: 0.00123
+  gradient_snr: 0.22869999706745148
+  active_units: 28
+iwae_k20_epochs50_seed42:
+  path: checkpoints/iwae_k20_epochs50_seed42.pt
+  type: iwae
+  k: 20
+  epochs: 50
+  training_time: 461.1885244846344
+  log_likelihood: -77.34
+  reconstruction_error: 69.69
+  weighted_reconstruction_error: 53.35
+  gradient_variance: 0.00132
+  gradient_snr: 0.22130000591278076
+  active_units: 26
+iwae_k5_epochs50_seed42:
+  path: checkpoints/iwae_k5_epochs50_seed42.pt
+  type: iwae
+  k: 5
+  epochs: 50
+  training_time: 443.15490889549255
+  log_likelihood: -78.36
+  reconstruction_error: 65.65
+  weighted_reconstruction_error: 54.54
+  gradient_variance: 0.00165
+  gradient_snr: 0.2442999929189682
+  active_units: 22
+vae_k1_epochs50_seed42:
+  path: checkpoints/vae_k1_epochs50_seed42.pt
+  type: vae
+  k: 1
+  epochs: 50
+  training_time: 422.9661154747009
+  log_likelihood: -81.06
+  reconstruction_error: 63.84
+  gradient_variance: 1.65
+  gradient_snr: 0.3758000135421753
+  active_units: 15
