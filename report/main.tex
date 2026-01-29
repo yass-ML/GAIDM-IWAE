@@ -71,7 +71,23 @@
 % ---------------------------------------------------------
 
 \begin{abstract}
-Les Autoencodeurs Variationnels (VAE) sont des modèles génératifs permettant d'approximer des distributions a posteriori complexes via la maximisation d'une borne inférieure variationnelle (ELBO). Cependant, l'objectif standard du VAE contraint souvent le modèle à apprendre des représentations simplifiées, limitant ainsi sa capacité de modélisation. Ce projet étudie l'Importance Weighted Autoencoder (IWAE), une généralisation du VAE qui optimise une borne strictement plus fine dérivée de l'échantillonnage préférentiel. Nous analysons l'impact théorique de cet objectif sur l'estimation des gradients et la flexibilité du postérieur. Nos expériences sur le jeu de données MNIST démontrent que l'utilisation de multiples échantillons pondérés ($K>1$) améliore significativement la log-vraisemblance par rapport au VAE standard ($K=1$). De plus, nos résultats confirment que l'IWAE exploite plus efficacement l'espace latent, augmentant le nombre d'unités actives et produisant des représentations plus riches. Cependant, nous étudions également une limitation critique : lorsque $K$ augmente, le rapport signal sur bruit (SNR) des gradients de l'encodeur diminue, dégradant potentiellement la capacité d'apprentissage de celui-ci.
+Les Autoencodeurs Variationnels (VAE) sont des modèles génératifs permettant
+d'approximer des distributions a posteriori complexes via la maximisation d'une
+borne inférieure variationnelle (ELBO). Cependant, l'objectif standard du VAE
+contraint souvent le modèle à apprendre des représentations simplifiées,
+limitant ainsi sa capacité de modélisation. Ce projet étudie l'Importance
+Weighted Autoencoder (IWAE), une généralisation du VAE qui optimise une borne
+strictement plus fine dérivée de l'échantillonnage préférentiel. Nous analysons
+l'impact théorique de cet objectif sur l'estimation des gradients et la
+flexibilité du postérieur. Nos expériences sur le jeu de données MNIST
+démontrent que l'utilisation de multiples échantillons pondérés ($K>1$) améliore
+significativement la log-vraisemblance par rapport au VAE standard ($K=1$). De
+plus, nos résultats confirment que l'IWAE exploite plus efficacement l'espace
+latent, augmentant le nombre d'unités actives et produisant des représentations
+plus riches. Cependant, nous étudions également une limitation critique :
+lorsque $K$ augmente, le rapport signal sur bruit (SNR) des gradients de
+l'encodeur diminue, dégradant potentiellement la capacité d'apprentissage de
+celui-ci.
 \end{abstract}
 
 \newpage
@@ -80,11 +96,31 @@ Les Autoencodeurs Variationnels (VAE) sont des modèles génératifs permettant 
 % ---------------------------------------------------------
 \section{Introduction}
 
-Les modèles génératifs profonds sont devenus un pilier de l'apprentissage automatique moderne, permettant la synthèse de données complexes telles que des images, du texte et de l'audio. Parmi ceux-ci, l'Autoencodeur Variationnel (VAE) \cite{kingma2013auto} se distingue comme une approche rigoureuse combinant réseaux de neurones et inférence bayésienne. En apprenant une correspondance probabiliste entre les observations et un espace latent structuré, les VAE offrent un cadre puissant pour la génération et l'apprentissage de représentations.
+Les modèles génératifs profonds sont devenus un pilier de l'apprentissage
+automatique moderne, permettant la synthèse de données complexes telles que des
+images, du texte et de l'audio. Parmi ceux-ci, l'Autoencodeur Variationnel (VAE)
+\cite{kingma2013auto} se distingue comme une approche rigoureuse combinant
+réseaux de neurones et inférence bayésienne. En apprenant une correspondance
+probabiliste entre les observations et un espace latent structuré, les VAE
+offrent un cadre puissant pour la génération et l'apprentissage de
+représentations.
 
-Cependant, l'objectif standard du VAE présente des limitations inhérentes. La borne inférieure sur l'évidence (ELBO) que les VAE maximisent peut être une approximation lâche de la vraie log-vraisemblance lorsque le postérieur approché $q_\phi(z|x)$ ne parvient pas à correspondre au vrai postérieur $p_\theta(z|x)$. Ce relâchement conduit à des phénomènes tels que l'\textbf{effondrement du postérieur} (posterior collapse), où le modèle ignore les dimensions latentes informatives et s'appuie entièrement sur le décodeur.
+Cependant, l'objectif standard du VAE présente des limitations inhérentes. La
+borne inférieure sur l'évidence (ELBO) que les VAE maximisent peut être une
+approximation lâche de la vraie log-vraisemblance lorsque le postérieur approché
+$q_\phi(z|x)$ ne parvient pas à correspondre au vrai postérieur $p_\theta(z|x)$.
+Ce relâchement conduit à des phénomènes tels que l'effondrement du postérieur
+(posterior collapse), où le modèle ignore les dimensions latentes informatives
+et s'appuie entièrement sur le décodeur.
 
-L'Importance Weighted Autoencoder (IWAE), introduit par \citet{burda2015importance}, répond à cette limitation en utilisant l'échantillonnage préférentiel pour obtenir une borne strictement plus serrée sur la log-vraisemblance. Dans ce rapport, nous étudions les fondements théoriques de l'IWAE, comparons ses performances au VAE standard sur le jeu de données MNIST, et explorons à la fois ses avantages et ses inconvénients potentiels. Nous examinons également les développements récents de la recherche qui ont construit sur le cadre de l'IWAE.
+L'Importance Weighted Autoencoder (IWAE), introduit par
+\citet{burda2015importance}, répond à cette limitation en utilisant
+l'échantillonnage préférentiel pour obtenir une borne strictement plus serrée
+sur la log-vraisemblance. Dans ce rapport, nous étudions les fondements
+théoriques de l'IWAE, comparons ses performances au VAE standard sur le jeu de
+données MNIST, et explorons à la fois ses avantages et ses inconvénients
+potentiels. Nous examinons également les développements récents de la recherche
+qui ont construit sur le cadre de l'IWAE.
 
 % ---------------------------------------------------------
 \section{Contexte Théorique}
@@ -169,9 +205,13 @@ La nouvelle borne découlant de l'inégalité de Jensen appliquée à la fonctio
 \end{itemize}
 
 \subsubsection{Démonstration: Borne monotonement croissante}
-Voici la preuve mathématique que la borne IWAE est monotonement croissante avec $K$ :
+Voici la preuve mathématique que la borne IWAE est monotonement croissante avec $K$ : \newline
 
-Soit $I \subset \{1, \dots, k\}$ avec $|I| = m$ un sous-ensemble uniformément distribué d'indices distincts de $\{1, \dots, k\}$. Nous utiliserons l'observation simple suivante : $\mathbb{E}_{I=\{i_1, \dots, i_m\}} \left[ \frac{a_{i_1} + \dots + a_{i_m}}{m} \right] = \frac{a_1 + \dots + a_k}{k}$ pour toute suite de nombres $a_1, \dots, a_k$.
+Soit $I \subset \{1, \dots, k\}$ avec $|I| = m$ un sous-ensemble uniformément
+distribué d'indices distincts de $\{1, \dots, k\}$. Nous utiliserons
+l'observation simple suivante : $\mathbb{E}_{I=\{i_1, \dots, i_m\}} \left[
+\frac{a_{i_1} + \dots + a_{i_m}}{m} \right] = \frac{a_1 + \dots + a_k}{k}$ pour
+toute suite de nombres $a_1, \dots, a_k$.
 
 En utilisant cette observation et l'inégalité de Jensen, nous obtenons :
 
@@ -250,7 +290,7 @@ Mathématiquement, lorsque $K \to \infty$, l'objectif IWAE approche :
     \mathcal{L}_\infty = \log p_\theta(x) = \log \mathbb{E}_{z \sim q_\phi}[w(x, z)]
 \end{equation}
 
-À cette limite, l'objectif dépend de l'encodeur \textbf{uniquement à travers son support}, pas sa distribution spécifique. Tant que $q_\phi(z|x) > 0$ partout où $p_\theta(x,z) > 0$, la borne est exacte. Cela signifie que le signal de gradient pour $\phi$ disparaît.
+À cette limite, l'objectif dépend de l'encodeur uniquement à travers son support, pas sa distribution spécifique. Tant que $q_\phi(z|x) > 0$ partout où $p_\theta(x,z) > 0$, la borne est exacte. Cela signifie que le signal de gradient pour $\phi$ disparaît.
 
 \subsection{Analyse du Rapport Signal sur Bruit}
 
@@ -259,7 +299,7 @@ Le SNR du gradient de l'encodeur peut être défini comme :
     \text{SNR}(\nabla_\phi \mathcal{L}_K) = \frac{|\mathbb{E}[\nabla_\phi \mathcal{L}_K]|}{\text{Std}[\nabla_\phi \mathcal{L}_K]}
 \end{equation}
 
-\citet{rainforth2018tighter} ont montré que tandis que le SNR pour le décodeur $\theta$ \textbf{augmente} avec $K$, le SNR pour l'encodeur $\phi$ \textbf{diminue} avec $K$ :
+\citet{rainforth2018tighter} ont montré que tandis que le SNR pour le décodeur $\theta$ augmente avec $K$, le SNR pour l'encodeur $\phi$ diminue avec $K$ :
 \begin{equation}
     \text{SNR}(\nabla_\phi \mathcal{L}_K) = \mathcal{O}(K^{-1/2})
 \end{equation}
@@ -272,7 +312,6 @@ Cette dégradation du SNR a des conséquences importantes :
 \begin{itemize}
     \item \textbf{Le décodeur apprend bien :} Le modèle génératif $p_\theta(x|z)$ continue de s'améliorer avec un $K$ plus grand.
     \item \textbf{L'encodeur peut stagner :} Le réseau d'inférence $q_\phi(z|x)$ reçoit des signaux de gradient diminuants et peut échouer à s'améliorer.
-    \item \textbf{Un K optimal existe :} Il y a typiquement une valeur optimale de $K$ qui équilibre la borne plus serrée contre la capacité d'apprentissage de l'encodeur.
 \end{itemize}
 
 Cette analyse suggère que simplement augmenter $K$ n'est pas toujours bénéfique. L'objectif IWAE crée une asymétrie où le décodeur bénéficie de plus d'échantillons tandis que l'encodeur en souffre.
@@ -487,17 +526,9 @@ Plusieurs techniques ont été proposées pour atténuer la dégradation du SNR 
 
 \textbf{VR-IWAE} \cite{daudel2024learning} : Daudel et al. (2024) ont analysé le comportement asymptotique des estimateurs reparamétrisés et doublement reparamétrisés lorsqu'ils sont appliqués à l'objectif VR-IWAE. Leur travail montre que pour des valeurs spécifiques du paramètre variationnel de Rényi $\alpha$, le SNR évolue favorablement avec à la fois le nombre d'estimations indépendantes $M$ et les échantillons d'importance $N$.
 
-\subsection{Variantes de l'IWAE}
-
-\textbf{MIWAE (Missing Data IWAE)} \cite{mattei2019miwae} : Étend l'IWAE pour gérer l'imputation de données manquantes en traitant les valeurs manquantes comme des variables latentes.
-
-\textbf{CIWAE (Combination IWAE)} \cite{huang2019ciwae} : Propose une combinaison convexe des objectifs VAE et IWAE pour équilibrer le compromis entre des bornes plus serrées et de meilleurs gradients pour l'encodeur.
-
-\textbf{IWAE Récursif} \cite{brekelmans2024recursive} : Des travaux récents (2024) explorent l'apprentissage récursif d'objectifs variationnels asymptotiques, étendant le cadre IWAE pour atteindre des bornes plus serrées grâce à l'échantillonnage préférentiel imbriqué.
-
 \subsection{Avancées Théoriques}
 
-\textbf{Sur le paradoxe de la borne plus serrée :} \citet{rainforth2018tighter} ont fourni une analyse rigoureuse montrant que des bornes plus serrées ne sont pas toujours meilleures pour l'apprentissage. Leur travail formalise le phénomène de dégradation du SNR et suggère que des valeurs intermédiaires de $K$ peuvent être optimales.
+Sur le paradoxe de la borne plus serrée : \citet{rainforth2018tighter} ont fourni une analyse rigoureuse montrant que des bornes plus serrées ne sont pas toujours meilleures pour l'apprentissage. Leur travail formalise le phénomène de dégradation du SNR et suggère que des valeurs intermédiaires de $K$ peuvent être optimales.
 
 \textbf{Prévention de l'Effondrement du Postérieur :} Des travaux récents tels que Scale-VAE \cite{scalevae2024} continuent d'aborder le problème d'effondrement du postérieur que tant le VAE que l'IWAE visent à résoudre, suggérant un intérêt continu pour un apprentissage robuste de l'espace latent.
 
