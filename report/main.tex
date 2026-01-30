@@ -32,6 +32,8 @@
 \usepackage{tikz}
 \usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc, decorations.pathreplacing}
 \usepackage{pgfplots}
+\usepackage{float}
+\usepackage{natbib}
 \pgfplotsset{compat=1.18}
 
 % Custom Colors
@@ -223,7 +225,6 @@ En utilisant cette observation et l'inégalité de Jensen, nous obtenons :
 \end{align}
 
 
-
 \subsection{Nouveauté 2 : Postérieurs Implicites Plus Riches}
 
 L'objectif IWAE induit une distribution a posteriori implicite qui peut être plus complexe que $q_\phi(z|x)$. Les poids d'importance normalisés agissent comme un filtre :
@@ -264,11 +265,11 @@ La somme agit comme un filet de sécurité, permettant à l'encodeur de faire de
 \section{Le Problème du SNR : Pourquoi un Grand K Nuit à l'Encodeur}
 \label{sec:snr_problem}
 
-Bien qu'augmenter $K$ fournisse une borne plus serrée sur la log-vraisemblance, cela s'accompagne d'un compromis critique : \textbf{la capacité d'apprentissage de l'encodeur se dégrade lorsque $K$ augmente}. Ce phénomène est lié au rapport signal sur bruit (SNR) de l'estimateur de gradient.
+Bien qu'augmenter $K$ fournisse une borne plus serrée sur la log-vraisemblance, cela s'accompagne d'un compromis critique : la capacité d'apprentissage de l'encodeur se dégrade lorsque $K$ augmente. Ce phénomène est lié au rapport signal sur bruit (SNR) de l'estimateur de gradient.
 
 \subsection{Décomposition du Gradient}
 
-L'objectif IWAE implique à la fois les paramètres génératifs $\theta$ (décodeur) et les paramètres d'inférence $\phi$ (encodeur). Le gradient par rapport à $\phi$ peut s'écrire en utilisant l'astuce de reparamétrisation \cite{kingma2013auto} :
+L'objectif IWAE implique à la fois les paramètres génératifs $\theta$ (décodeur) et les paramètres d'inférence $\phi$ (encodeur). Le gradient par rapport à $\phi$ peut s'écrire en utilisant l'astuce de reparamétrisation:
 \begin{equation}
     \nabla_\phi \mathcal{L}_K = \mathbb{E}_{\epsilon_1, \ldots, \epsilon_K} \left[ \sum_{i=1}^{K} \tilde{w}_i \nabla_\phi \log w(x, z_i(\phi, \epsilon_i), \theta, \phi) \right]
 \end{equation}
@@ -282,7 +283,7 @@ Lorsque $K \to \infty$, quelque chose de contre-intuitif se produit. Considéron
 \begin{itemize}
     \item À mesure que $K$ augmente, la distribution des poids d'importance devient plus concentrée : typiquement un échantillon aura $\tilde{w}_i \approx 1$ tandis que tous les autres auront $\tilde{w}_j \approx 0$.
     \item La mise à jour du gradient est dominée par le seul échantillon ``gagnant''.
-    \item Cet échantillon gagnant est de plus en plus déterminé par \textbf{l'a priori $p(z)$ et la vraisemblance $p_\theta(x|z)$}, et non par la qualité de l'encodeur $q_\phi(z|x)$.
+    \item Cet échantillon gagnant est de plus en plus déterminé par l'a priori $p(z)$ et la vraisemblance $p_\theta(x|z)$, et non par la qualité de l'encodeur $q_\phi(z|x)$.
 \end{itemize}
 
 Mathématiquement, lorsque $K \to \infty$, l'objectif IWAE approche :
@@ -493,7 +494,7 @@ La comparaison visuelle des échantillons générés montre que l'IWAE produit d
 % ---------------------------------------------------------
 \section{Résumé des Compromis}
 
-\begin{table}[h]
+\begin{table}[H]
     \centering
     \begin{tabular}{l|c|c}
         \toprule
@@ -514,24 +515,26 @@ La comparaison visuelle des échantillons générés montre que l'IWAE produit d
 % ---------------------------------------------------------
 \section{Recherches Récentes sur l'IWAE}
 
-Depuis l'article original sur l'IWAE \cite{burda2015importance}, des recherches significatives ont abordé ses limitations et étendu ses applications.
+Depuis l'article original sur l'IWAE \cite{burda2015importance}, des recherches significatives ont abordé ses limitations théoriques et étendu ses cas d'usage.
 
 \subsection{Adresser le Problème du SNR}
-
 Plusieurs techniques ont été proposées pour atténuer la dégradation du SNR du gradient de l'encodeur :
 
-\textbf{IWAE-STL (Sticking the Landing)} \cite{roeder2017sticking} : Cette approche supprime le terme de fonction de score du gradient, réduisant la variance et améliorant la stabilité de l'entraînement de l'encodeur.
+\begin{itemize}
+    \item \textbf{IWAE-STL (Sticking the Landing)} \cite{roeder2017sticking} : Cette approche supprime le terme de fonction de score du gradient, ce qui réduit la variance et stabilise l'entraînement de l'encodeur.
+    
+    \item \textbf{IWAE-DREG} \cite{tucker2019doubly} : Tucker et al. ont proposé un estimateur doublement reparamétrisé (Doubly Reparameterized Gradient Estimator) qui fournit des gradients non biaisés avec une variance plus faible.
+    
+    \item \textbf{Analyse Asymptotique (VR-IWAE)} \cite{daudel2024learning} : Daudel et Roueff ont analysé le comportement asymptotique des estimateurs appliqués à l'objectif VR-IWAE. Leur travail démontre que pour certaines valeurs du paramètre $\alpha$ de Rényi, le SNR peut évoluer favorablement avec le nombre d'échantillons.
+\end{itemize}
 
-\textbf{IWAE-DREG (Doubly Reparameterized Gradient Estimators)} \cite{tucker2019doubly} : Tucker et al. ont proposé un estimateur doublement reparamétrisé qui fournit des gradients non biaisés avec une variance plus faible pour le réseau d'inférence. Cette approche a montré une amélioration du SNR pour les composants encodeur et décodeur.
+\subsection{Avancées Théoriques et Applications}
 
-\textbf{VR-IWAE} \cite{daudel2024learning} : Daudel et al. (2024) ont analysé le comportement asymptotique des estimateurs reparamétrisés et doublement reparamétrisés lorsqu'ils sont appliqués à l'objectif VR-IWAE. Leur travail montre que pour des valeurs spécifiques du paramètre variationnel de Rényi $\alpha$, le SNR évolue favorablement avec à la fois le nombre d'estimations indépendantes $M$ et les échantillons d'importance $N$.
+\textbf{Le Paradoxe de la Borne :} \citet{rainforth2018tighter} ont prouvé que des bornes plus serrées (plus de $K$) ne garantissent pas un meilleur apprentissage de l'encodeur, formalisant la chute du SNR en $\mathcal{O}(K^{-1/2})$.
 
-\subsection{Avancées Théoriques}
+\textbf{Prévention de l'Effondrement :} Des travaux récents comme Scale-VAE \cite{scalevae2024} continuent de proposer des architectures robustes contre l'effondrement du postérieur, un problème persistant pour les modèles à variables latentes.
 
-Sur le paradoxe de la borne plus serrée : \citet{rainforth2018tighter} ont fourni une analyse rigoureuse montrant que des bornes plus serrées ne sont pas toujours meilleures pour l'apprentissage. Leur travail formalise le phénomène de dégradation du SNR et suggère que des valeurs intermédiaires de $K$ peuvent être optimales.
-
-\textbf{Prévention de l'Effondrement du Postérieur :} Des travaux récents tels que Scale-VAE \cite{scalevae2024} continuent d'aborder le problème d'effondrement du postérieur que tant le VAE que l'IWAE visent à résoudre, suggérant un intérêt continu pour un apprentissage robuste de l'espace latent.
-
+\textbf{Applications aux Données Manquantes :} Au-delà de l'amélioration de la vraisemblance, l'IWAE s'est révélé particulièrement efficace pour l'imputation de données. Le modèle MIWAE \cite{mattei2019miwae} utilise la borne IWAE pour entraîner des réseaux capables de gérer des jeux de données incomplets sans hypothèses restrictives sur le mécanisme de manque.
 % ---------------------------------------------------------
 \section{Conclusion}
 
@@ -544,58 +547,44 @@ Les travaux futurs pourraient explorer des méthodes adaptatives qui ajustent dy
 % ---------------------------------------------------------
 % REFERENCES
 % ---------------------------------------------------------
-\bibliographystyle{plain}
 \begin{thebibliography}{99}
 
-\bibitem{kingma2013auto}
-Kingma, D.P. et Welling, M. (2013).
-\newblock Auto-Encoding Variational Bayes.
-\newblock {\em arXiv preprint arXiv:1312.6114}.
-
-\bibitem{burda2015importance}
+\bibitem[Burda et al.(2015)]{burda2015importance}
 Burda, Y., Grosse, R., et Salakhutdinov, R. (2015).
 \newblock Importance Weighted Autoencoders.
 \newblock {\em arXiv preprint arXiv:1509.00519}.
 
-\bibitem{rainforth2018tighter}
-Rainforth, T., Kosiorek, A.R., Le, T.A., Maddison, C.J., Igl, M., Wood, F., et Teh, Y.W. (2018).
-\newblock Tighter Variational Bounds are Not Necessarily Better.
-\newblock {\em International Conference on Machine Learning (ICML)}.
-
-\bibitem{roeder2017sticking}
+\bibitem[Roeder et al.(2017)]{roeder2017sticking}
 Roeder, G., Wu, Y., et Duvenaud, D. (2017).
 \newblock Sticking the Landing: Simple, Lower-Variance Gradient Estimators for Variational Inference.
-\newblock {\em Advances in Neural Information Processing Systems (NeurIPS)}.
+\newblock {\em NeurIPS}.
 
-\bibitem{tucker2019doubly}
+\bibitem[Tucker et al.(2019)]{tucker2019doubly}
 Tucker, G., Lawson, D., Gu, S., et Maddison, C.J. (2019).
 \newblock Doubly Reparameterized Gradient Estimators for Monte Carlo Objectives.
-\newblock {\em International Conference on Learning Representations (ICLR)}.
+\newblock {\em ICLR}.
 
-\bibitem{daudel2024learning}
-Daudel, K., Guérin, J., et Moulines, E. (2024).
+% FIXED AUTHORS
+\bibitem[Daudel et Roueff(2024)]{daudel2024learning}
+Daudel, K. et Roueff, F. (2024).
 \newblock Learning with Importance Weighted Variational Inference: Asymptotics for Gradient Estimators of the VR-IWAE Bound.
-\newblock {\em arXiv preprint}.
+\newblock {\em arXiv preprint arXiv:2410.11666}.
 
-\bibitem{mattei2019miwae}
+\bibitem[Rainforth et al.(2018)]{rainforth2018tighter}
+Rainforth, T. et al. (2018).
+\newblock Tighter Variational Bounds are Not Necessarily Better.
+\newblock {\em ICML}.
+
+% FIXED AUTHORS AND TITLE
+\bibitem[Song et al.(2024)]{scalevae2024}
+Song, T., Sun, J., Liu, X., et Peng, W. (2024).
+\newblock Scale-VAE: Preventing Posterior Collapse in Variational Autoencoder.
+\newblock {\em LREC-COLING 2024}.
+
+\bibitem[Mattei et Frellsen(2019)]{mattei2019miwae}
 Mattei, P.A. et Frellsen, J. (2019).
 \newblock MIWAE: Deep Generative Modelling and Imputation of Incomplete Data Sets.
-\newblock {\em International Conference on Machine Learning (ICML)}.
-
-\bibitem{huang2019ciwae}
-Huang, C.W. et Wu, C. (2019).
-\newblock CIWAE: Convex Combinations of IWAE and VAE.
-\newblock {\em NeurIPS Workshop on Bayesian Deep Learning}.
-
-\bibitem{brekelmans2024recursive}
-Brekelmans, R. et al. (2024).
-\newblock Recursive Learning of Asymptotic Variational Objectives.
-\newblock {\em International Conference on Machine Learning (ICML)}.
-
-\bibitem{scalevae2024}
-Zhang, X. et al. (2024).
-\newblock Scale-VAE: Preventing Posterior Collapse in Variational Autoencoder.
-\newblock {\em arXiv preprint}.
+\newblock {\em ICML}.
 
 \end{thebibliography}
 
