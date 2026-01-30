@@ -7,16 +7,20 @@ class VAE(nn.Module):
         super().__init__()
         self.encoder = nn.Sequential(
             nn.Linear(in_features=input_size, out_features=hidden_size),
+            nn.BatchNorm1d(hidden_size),
             nn.Tanh(),
             nn.Linear(in_features=hidden_size, out_features=hidden_size),
+            nn.BatchNorm1d(hidden_size),
             nn.Tanh(),
             nn.Linear(in_features=hidden_size, out_features=2*latent_size)
         )
 
         self.decoder = nn.Sequential(
             nn.Linear(in_features=latent_size, out_features=hidden_size),
+            nn.BatchNorm1d(hidden_size),
             nn.Tanh(),
             nn.Linear(in_features=hidden_size, out_features=hidden_size),
+            nn.BatchNorm1d(hidden_size),
             nn.Tanh(),
             nn.Linear(in_features=hidden_size, out_features=output_size),
             nn.Sigmoid()
