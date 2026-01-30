@@ -441,10 +441,12 @@ Cela suggère que pour des applications pratiques, un $K$ intermédiaire (entre 
 \subsection{Dynamique de l'Espace Latent (Posterior Collapse)}
 
 Un problème récurrent des VAE est l'effondrement du postérior (Posterior Collapse), où l'encodeur ignore le code latent et la distribution a posteriori collapse sur le prior.
-Nous quantifions cela par le nombre d'unités actives $A_u$, défini par le seuil $\epsilon = 0.01$ :
+% Replace your current simple definition with this formal one:
+Nous quantifions l'activité d'une dimension latente $u$ en utilisant la statistique de variance définie par Burda et al. :
 \begin{equation}
-    A_u = \sum_{j=1}^{D_z} \mathbb{I} \left[ \frac{1}{N} \sum_{i=1}^N \mathbb{KL}(q(z_j|x^{(i)}) || p(z_j)) > \epsilon \right]
+    A_u = \text{Cov}_x \left( \mathbb{E}_{u \sim q(u|x)} [u] \right)
 \end{equation}
+Une unité est considérée comme "active" si $A_u > 10^{-2}$. Cette mesure capture si la moyenne du postérior pour cette dimension varie significativement en fonction de la donnée d'entrée $x$.
 
 \begin{figure}[h]
     \centering
@@ -533,28 +535,53 @@ Le Tableau~\ref{tab:tradeoffs} résume les dynamiques observées. Le choix de $K
 \end{table}
 
 % ---------------------------------------------------------
-\section{Recherches Récentes sur l'IWAE}
+\section{État de l'Art et Avancées Récentes}
 
-Depuis l'article original sur l'IWAE \cite{burda2015importance}, des recherches significatives ont abordé ses limitations théoriques et étendu ses cas d'usage.
+Depuis la publication séminale de \citet{burda2015importance}, la communauté de recherche a identifié une dichotomie fascinante : si l'IWAE améliore considérablement l'apprentissage du modèle génératif (décodeur), il pose des défis uniques pour le réseau d'inférence (encodeur). Cette section analyse les solutions mathématiques proposées pour résoudre ces limitations.
 
-\subsection{Adresser le Problème du SNR}
-Plusieurs techniques ont été proposées pour atténuer la dégradation du SNR du gradient de l'encodeur :
+\subsection{Le "Paradoxe de Rainforth" et le Problème du SNR}
 
-\begin{itemize}
-    \item \textbf{IWAE-STL (Sticking the Landing)} \cite{roeder2017sticking} : Cette approche supprime le terme de fonction de score du gradient, ce qui réduit la variance et stabilise l'entraînement de l'encodeur.
-    
-    \item \textbf{IWAE-DREG} \cite{tucker2019doubly} : Tucker et al. ont proposé un estimateur doublement reparamétrisé (Doubly Reparameterized Gradient Estimator) qui fournit des gradients non biaisés avec une variance plus faible.
-    
-    \item \textbf{Analyse Asymptotique (VR-IWAE)} \cite{daudel2024learning} : Daudel et Roueff ont analysé le comportement asymptotique des estimateurs appliqués à l'objectif VR-IWAE. Leur travail démontre que pour certaines valeurs du paramètre $\alpha$ de Rényi, le SNR peut évoluer favorablement avec le nombre d'échantillons.
-\end{itemize}
+Le défi central de l'IWAE moderne a été formalisé par \citet{rainforth2018tighter}. Ils ont démontré théoriquement et empiriquement que des bornes plus serrées (obtenues en augmentant $K$) ne garantissent pas un meilleur apprentissage de l'encodeur.
 
-\subsection{Avancées Théoriques et Applications}
+Le gradient de l'estimateur IWAE souffre d'un rapport signal-sur-bruit (SNR) qui se dégrade asymptotiquement :
+\begin{equation}
+    \text{SNR}(\nabla_\phi \mathcal{L}_K) = \mathcal{O}(\sqrt{K} \cdot K^{-1}) = \mathcal{O}(K^{-1/2})
+\end{equation}
+Cela signifie que plus nous améliorons l'approximation de la log-vraisemblance (en augmentant $K$), plus le signal de gradient reçu par l'encodeur devient bruité, rendant l'optimisation instable pour les grands $K$.
 
-\textbf{Le Paradoxe de la Borne :} \citet{rainforth2018tighter} ont prouvé que des bornes plus serrées (plus de $K$) ne garantissent pas un meilleur apprentissage de l'encodeur, formalisant la chute du SNR en $\mathcal{O}(K^{-1/2})$.
+\subsection{Solutions via Réduction de Variance}
 
-\textbf{Prévention de l'Effondrement :} Des travaux récents comme Scale-VAE \cite{scalevae2024} continuent de proposer des architectures robustes contre l'effondrement du postérieur, un problème persistant pour les modèles à variables latentes.
+Pour contrer cet effet, plusieurs estimateurs alternatifs du gradient ont été développés :
 
-\textbf{Applications aux Données Manquantes :} Au-delà de l'amélioration de la vraisemblance, l'IWAE s'est révélé particulièrement efficace pour l'imputation de données. Le modèle MIWAE \cite{mattei2019miwae} utilise la borne IWAE pour entraîner des réseaux capables de gérer des jeux de données incomplets sans hypothèses restrictives sur le mécanisme de manque.
+\subsubsection{IWAE-STL : "Sticking the Landing"}
+\citet{roeder2017sticking} ont identifié que le terme de la "fonction de score" dans le gradient standard introduit une variance élevée sans contribuer à l'espérance du gradient (car son espérance est nulle).
+L'approche **Sticking the Landing (STL)** propose une modification simple : détacher le terme de score du graphe de computation lors de la rétropropagation.
+\begin{equation}
+    \nabla_\phi^{\text{STL}} \mathcal{L} \approx \sum_{i=1}^K \tilde{w}_i \nabla_\phi \log p_\theta(x, z_i)
+\end{equation}
+En éliminant la dérivée du terme de score $\nabla_\phi \log q_\phi$, STL réduit la variance et stabilise l'entraînement de l'encodeur, permettant l'utilisation de $K$ plus grands.
+
+\subsubsection{IWAE-DREG : Estimateurs Doublement Reparamétrisés}
+\citet{tucker2019doubly} ont proposé une dérivation plus rigoureuse appelée **DREG** (Doubly Reparameterized Gradient). En appliquant deux fois l'astuce de reparamétrisation, ils obtiennent un estimateur où les poids d'importance apparaissent au carré :
+\begin{equation}
+    \nabla_\phi^{\text{DREG}} \mathcal{L}_K = \mathbb{E}_{\epsilon} \left[ \sum_{i=1}^K \tilde{w}_i^2 \frac{\partial \log w_i}{\partial z_i} \frac{\partial z_i}{\partial \phi} \right]
+\end{equation}
+Cette formulation penalise plus fortement les échantillons à faible poids et ne souffre pas de la dégradation du SNR, surpassant l'estimateur standard pour les grands $K$.
+
+\subsubsection{Généralisation : VR-IWAE}
+Récemment, \citet{daudel2024learning} ont étendu cette analyse au cadre de l'Inférence Variationnelle de Rényi (VR-IWAE). Leur analyse asymptotique démontre que pour certaines valeurs du paramètre $\alpha$ de Rényi, et en utilisant des estimateurs de type DREG, il est possible de maintenir un SNR favorable même lorsque le nombre d'échantillons augmente.
+
+
+
+\subsection{Extensions et Applications Concrètes}
+
+Au-delà de l'amélioration de l'optimisation, l'IWAE a permis des avancées dans des domaines où le VAE standard échouait.
+
+\textbf{Imputation de Données Manquantes (MIWAE) :}
+\citet{mattei2019miwae} ont introduit le MIWAE pour traiter les données manquantes. Contrairement aux méthodes classiques qui imputent une valeur unique, MIWAE utilise les poids d'importance pour intégrer sur l'incertitude des valeurs manquantes, atteignant l'état de l'art sur les benchmarks UCI.
+
+\textbf{Interpolation Convexe (CIWAE) :}
+Pour concilier la bonne inférence du VAE et la bonne génération de l'IWAE, \citet{huang2019ciwae} ont proposé d'optimiser une combinaison convexe des deux bornes, permettant de guider l'encodeur avec un signal fort (VAE) tout en affinant la borne (IWAE).
 % ---------------------------------------------------------
 \section{Conclusion Générale et Perspectives}
 
@@ -578,11 +605,10 @@ En revanche, si l'objectif est l'**apprentissage de représentations** (disentan
 
 \subsection{Perspectives Futures}
 
-L'avenir de l'inférence variationnelle réside probablement dans la résolution de l'antagonisme biais-variance. Deux directions semblent particulièrement prometteuses :
-\begin{itemize}
-    \item \textbf{K Adaptatif :} Développer des algorithmes capables d'ajuster dynamiquement $K$ au cours de l'entraînement, commençant bas pour apprendre une bonne inférence grossière, puis augmentant pour affiner la borne générative.
-    \item \textbf{Hybridation DREG/STL :} L'intégration par défaut des estimateurs à faible variance (DREG) dans les frameworks de deep learning (PyTorch/TensorFlow) pourrait rendre l'IWAE aussi standard et facile à utiliser que le VAE actuel, rendant l'utilisation de $K=1$ obsolète pour la plupart des applications.
-\end{itemize}
+L'avenir de l'inférence variationnelle réside probablement dans la résolution de l'antagonisme biais-variance. Deux directions semblent particulièrement prometteuses pour les travaux futurs. 
+
+Premièrement, l'approche du K Adaptatif permettrait de développer des algorithmes capables d'ajuster dynamiquement $K$ au cours de l'entraînement, commençant bas pour apprendre une bonne inférence grossière, puis augmentant pour affiner la borne générative. 
+Deuxièmement, l'Hybridation DREG/STL et l'intégration par défaut des estimateurs à faible variance dans les frameworks modernes (PyTorch/TensorFlow) pourraient rendre l'IWAE aussi standard et facile à utiliser que le VAE actuel, rendant l'utilisation de $K=1$ obsolète pour la plupart des applications.
 
 En conclusion, bien que le VAE ait posé les fondations de l'apprentissage génératif moderne, l'IWAE et ses variantes constituent l'évolution nécessaire pour atteindre des modèles probabilistes véritablement robustes et expressifs.
 % ---------------------------------------------------------
